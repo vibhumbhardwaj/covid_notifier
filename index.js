@@ -3,9 +3,32 @@ const fetch = require('node-fetch');
 var nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
-var player = require('play-sound')(opts = { player: "c:\\asus\\mplayer\\mplayer.exe" })
+var player = require('play-sound')(opts = { player: process.env.MUSIC_PLAYER });
 
 var Memory_Emails = require('./RECEIVER_EMAILS.json').emails;
+
+const startingEmail = `<div style="background: red;">&nbsp;</div>
+<div style="background: red;">&nbsp;</div>
+<div style="background: red;">&nbsp;</div>
+<h2 style="text-align: center;">Haryana Government Social Services .com</h2>
+<h4 style="text-align: center;">Vacc Notifier&copy;</h4>
+<div style="background: red;">&nbsp;</div>
+<hr />
+<h4>Hello Dear,</h4>`;
+
+const slotsAvailableGreeting = `<h4>Saste Nashe is available in your area... Go enjoy:</h4><h4>&nbsp;</h4>`;
+
+const bookSlotCallToAction = `<p>&nbsp;</p>
+<h2><em>Please visit website: <a href="https://selfregistration.cowin.gov.in"><span style="background-color: #ffff00;">COWIN.GOV.IN</span></a> to book your slot now!</em></h2>
+<p>&nbsp;</p>`;
+
+const closingEmail = `<h3><em>Yours Truly,</em></h3>
+<!--<h2>Kurukshetra Development Board</h2>-->
+<p><img src="https://pbs.twimg.com/profile_images/485331283166244864/tUuqIX-R_400x400.jpeg" alt="" width="218" height="218" /></p>
+<p><em>Acha Chalta hu.. Voting Booth mein yaad rakhna..</em></p>
+<div style="background: red;">&nbsp;</div>
+<hr />
+<p style="text-align: left;"><strong><em>Powered by Microsoft&trade; Azure Secure Services.</em></strong></p>`
 /*
 //add new email to json:
 console.log(Memory_Emails);
@@ -20,7 +43,7 @@ fs.writeFile(path.resolve(__dirname,'RECEIVER_EMAILS.json'), JSON.stringify(json
   }
 });
 */
-let result = [];
+
 
 var transporter = nodemailer.createTransport({
   host: process.env.MAIL_SMTP_SERVER,
@@ -41,17 +64,17 @@ var transporter = nodemailer.createTransport({
 let sendEmailsBro = (result, currentDate) => {
   console.log(currentDate, ' >> Sending Emails.. found something I guess.');
   if (!(result.length && result.length > 0)) return;
-  let emailBody = 'Saste nashe available here: go enjoy...\n\n';
+  let emailBody = startingEmail + slotsAvailableGreeting;
   for (let i = 0; i < result.length; i++) {
-    emailBody += `${i + 1}. ${result[i]}\n`;
+    emailBody += `<h4>${i + 1}. ${result[i]}</h4>`;
   }
-  emailBody += `Please visit official Modiji powered website: <a>https://selfregistration.cowin.gov.in</a>`;
+  emailBody += bookSlotCallToAction + closingEmail;
 
   var mailOptions = {
-    from: '"Vacc Notifier © - Powered by MS™" <covid_notifier@zohomail.in>',
+    from: '"Kurukshetra Vacc Notifier" <covid_notifier@zohomail.in>',
     to: Memory_Emails.toString(),
     subject: `Available Centers: ${result.length}`,
-    text: emailBody
+    html: emailBody
   };
 
   transporter.sendMail(mailOptions, function (error, info) {
@@ -86,6 +109,7 @@ let getTodayDate = () => {
   return [dd + '-' + mm + '-' + yyyy, `${hh}:${min}:${sec}`];
 }
 let runThisShit = () => {
+  let result = [];
   let currentDate = getTodayDate();
 
   let url = `https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id=${KURUKSHETRA_ID}&date=${currentDate[0]}`;
@@ -108,23 +132,21 @@ let runThisShit = () => {
           let available = +sessions[j].available_capacity;
           let date = sessions[j].date;
           if (available > 0) {
-            result.push(`${sessionName}@${date} -- ${available}`);
+            result.push(`${sessionName}@${date} -- ${available} slot(s) available!`);
           }
           //console.log(`${sessionName}@${date} -- ${available}`);
         }
       }
       //console.log(`Total available centers with vaccines: ${result.length}`);
-      //result.push(`Sorry bro no nashe available at the moment. \n\n<>Ghar raho. Safe raho.</b>`);
+      //result.push(`Sorry bro no nashe available at the moment. <b>Ghar raho. Safe raho.</b>`);
       if (result.length > 0) {
-        player.play('./doorbell.mp3', function (err) {
-          if (err) throw err;
-        });
+        player.play('doorbell.mp3');
         sendEmailsBro(result, currentDate);
       } else {
         console.log(`${currentDate} -- Khatam / Tata / Bye Bye`);
       }
     });
-
 }
-setInterval(runThisShit, 3500);
+
 //runThisShit();
+setInterval(runThisShit, 3500);

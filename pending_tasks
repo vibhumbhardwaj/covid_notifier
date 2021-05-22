@@ -1,9 +1,12 @@
+1. Only email me once for each slot! 
+
+>> DEPRECIATED
 1. create html application for this. 
 1a. to add recipient emails.
 1b. to toggle on/off the application.
 1c. only run api if password validated.
 
-2. Run this after every 5 seconds.
+X. Run this after every 5 seconds.
 
 
 X. email nahi jaa rahi.
