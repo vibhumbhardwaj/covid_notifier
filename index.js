@@ -5,7 +5,29 @@ const fs = require('fs');
 const path = require('path');
 var player = require('play-sound')(opts = { player: process.env.MUSIC_PLAYER });
 
+/* 
+Memory_Emails will include all the emails that need to be notified.. Initiated on first run, and updated OTG as required.
+Structure ::
+['email@zoho.com', 'more@gmail.com']
+*/
 var Memory_Emails = require('./RECEIVER_EMAILS.json').emails;
+
+/*
+Memory_Results will incorporate all the results tackled so far by the application.
+Structure ::
+{
+  'dd-mm-yyyy' : ['hospital 1', 'hospital 2'],
+  'd2-mm-yyyy' : ...
+}
+*/
+var Memory_Results = {};
+
+/*
+for better logging. If not available recently, no need to print khatam tata bye bye...
+*/
+var Memory_Available_Recently=true;
+
+const KURUKSHETRA_ID = 186;
 
 const startingEmail = `<div style="background: red;">&nbsp;</div>
 <div style="background: red;">&nbsp;</div>
@@ -22,10 +44,14 @@ const bookSlotCallToAction = `<p>&nbsp;</p>
 <h2><em>Please visit website: <a href="https://selfregistration.cowin.gov.in"><span style="background-color: #ffff00;">COWIN.GOV.IN</span></a> to book your slot now!</em></h2>
 <p>&nbsp;</p>`;
 
+let sudhaImg = `https://pbs.twimg.com/profile_images/485331283166244864/tUuqIX-R_400x400.jpeg`;
+let ourFoto = `https://lh3.googleusercontent.com/Xk7ehWAAkAHDt4HFScwbiuJRr51ykzPa3A-HTGg0IlbtW2w4mf-9F1AL7xKxLXb8iVM1b5j7gTjcV13eTBM-Xa20Z6AQYf4puhUKd5AabKFQ58nN_LVJSFYyIN6eVJE-vUyRbFDYBrgVQId7aYkkFJLmGT8EBFzJ86mkuAmSHFXe8wYk--iJ-U9mJqtdIFakiduqYsFerPmlQYuMXx2QDkT0_mN6KFIvn3F6Jza0qd09cFz69jO-Ee8Diq7TF9EeHCQ9HsUBx1QpZAVUFNl7zpONazjKe3qQuBFP93Vi54HydyhWrpUmD_7ieZdTdGXi7hiygMgAHRMWmB7mJsNEIsRi8zfNVUY55FMGLrc6hikI2RVHXCO_h_6GWOMM6lNFs5E77bpKKyd7pz5oYYac8vjl3enCcEicCwVCMeDRWwxLoEjQzNgNxdTgw8Pldn_ODvOSuFPCvAXsXOuuJloGq-cg0tz_krKfU-R-RgTA-FqoriyLXIXJEKB4awOkZvQpim9etHTI1T37wkPgPVO8QMviprant0hpwzDKLZsPDL9b17W9HEsjZEPaskfQtd4M3OBjQpqCx3r5TZ621KQk2SeXhzgnrxhdEB09IXirnj-nMJCakULYn22cwuS_kps5bXuypvChu-NOcI8Clyzd_8XNaY7dSCd9GePPQwqI1IsBeE-X9jXCH9fBvvivJq0cGNxNKwSLNCcUmqTRVvNRITAlxQ=w1288-h966-no?authuser=0`;
+//sudha image dimensions: 220 220
+
 const closingEmail = `<h3><em>Yours Truly,</em></h3>
 <!--<h2>Kurukshetra Development Board</h2>-->
-<p><img src="https://pbs.twimg.com/profile_images/485331283166244864/tUuqIX-R_400x400.jpeg" alt="" width="218" height="218" /></p>
-<p><em>Acha Chalta hu.. Voting Booth mein yaad rakhna..</em></p>
+<p><img src="${ourFoto}" alt="" width="380" height="285" /></p>
+<p><em>Ayy LMAO</em></p>
 <div style="background: red;">&nbsp;</div>
 <hr />
 <p style="text-align: left;"><strong><em>Powered by Microsoft&trade; Azure Secure Services.</em></strong></p>`
@@ -86,7 +112,7 @@ let sendEmailsBro = (result, currentDate) => {
   });
 }
 
-const KURUKSHETRA_ID = 186;
+
 
 let getTodayDate = () => {
 
@@ -108,6 +134,8 @@ let getTodayDate = () => {
   }
   return [dd + '-' + mm + '-' + yyyy, `${hh}:${min}:${sec}`];
 }
+
+
 let runThisShit = () => {
   let result = [];
   let currentDate = getTodayDate();
@@ -131,8 +159,14 @@ let runThisShit = () => {
         for (let j = 0; j < sessions.length; j++) {
           let available = +sessions[j].available_capacity;
           let date = sessions[j].date;
-          if (available > 0) {
-            result.push(`${sessionName}@${date} -- ${available} slot(s) available!`);
+          if (available > 0 ) {
+            if(!Array.isArray(Memory_Results[date])) {
+              Memory_Results[date] = [];
+            }
+            if(!Memory_Results[date].includes(sessionName)) {
+              result.push(`${sessionName}@${date} -- ${available} slot(s) available!`);
+              Memory_Results[date].push(sessionName);
+            }     
           }
           //console.log(`${sessionName}@${date} -- ${available}`);
         }
@@ -142,11 +176,15 @@ let runThisShit = () => {
       if (result.length > 0) {
         player.play('doorbell.mp3');
         sendEmailsBro(result, currentDate);
-      } else {
-        console.log(`${currentDate} -- Khatam / Tata / Bye Bye`);
+        Memory_Available_Recently = true;
+      } else if(Memory_Available_Recently) {
+        Memory_Available_Recently=false;
       }
+    })
+    .catch(e => {
+      //shit happens lmao
     });
 }
-
+console.log(getTodayDate(), ` >> Searching ....`);
 //runThisShit();
-setInterval(runThisShit, 3500);
+setInterval(runThisShit, 5000);
