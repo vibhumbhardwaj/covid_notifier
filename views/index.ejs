@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+
+<head>
+  <title>Covid Notifier</title>
+  <link rel="stylesheet" href="/css/bootstrap-4.5.0.min.css">
+</head>
+
+<body>
+
+
+  <div id='passwordSection' style="padding-top:5%; padding-left: 5%; text-align: center;">
+    <h3>password please</h3>
+    <input type="password" id="password" class='input'>
+    <span id="unauthorized" class="text-warning" style="display: none;"></span>
+  </div>
+
+  <div id='mainSection' style="display: none;">
+    <span>
+      <input type="checkbox" id="soundToggle" name="enableSounds" value="enableSounds">
+      <label for="enableSounds">Audio Notifications</label>
+    </span>
+    <span>
+      <input type="checkbox" id="emailToggle" name="enableEmails" value="enableEmails">
+      <label for="enableEmails">Email Notifications</label>
+    </span>
+  </div>
+
+  <script>
+    let pwdField = document.querySelector('#password');
+    let addEmailField = document.querySelector('#addEmail');
+    let removeEmailField = document.querySelector('#removeEmail');
+    let enableSoundsCheck = document.querySelector('#soundToggle');
+    let enableEmailsCheck = document.querySelector('#emailToggle');
+    enableEmailsCheck.checked = false;
+    enableSoundsCheck.checked = true;
+
+    let pwdDiv = document.querySelector('#passwordSection');
+    let mainDiv = document.querySelector('#mainSection');
+
+
+    pwdField.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        //call localhost/api/authorize : body : password
+        //receive secret, store it for later.
+        // .. and show the actual content
+      }
+    });
+
+    addEmailField.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        //call localhost/api/secured/addNewEmail : body : email
+        //receive secret, store it for later.
+        // alert
+      }
+    });
+
+    removeEmailField.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        //call localhost/api/secured/unsubscribeEmail : body : email
+        //receive secret, store it for later.
+        // give a window.alert
+      }
+    });
+
+    enableEmailsCheck.addEventListener('change', e => {
+     // call localhost/api/secured/toggleEmailAlerts
+    });
+
+    enableSoundsCheck.addEventListener('change', e => {
+     // call localhost/api/secured/toggleSoundAlerts
+    });
+
+
+
+  </script>
+</body>
+
+</html>
