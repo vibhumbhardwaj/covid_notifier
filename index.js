@@ -3,7 +3,7 @@ const fetch = require('node-fetch');
 var nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
-const sound = require("sound-play");
+var player = require('play-sound')(opts = { player: "c:\\asus\\mplayer\\mplayer.exe" })
 
 var Memory_Emails = require('./RECEIVER_EMAILS.json').emails;
 /*
@@ -116,11 +116,9 @@ let runThisShit = () => {
       //console.log(`Total available centers with vaccines: ${result.length}`);
       //result.push(`Sorry bro no nashe available at the moment. \n\n<>Ghar raho. Safe raho.</b>`);
       if (result.length > 0) {
-        try {
-          sound.play("./doorbell.mp3",1)/*.then((response) => console.log("done"))*/;
-        } catch(e){
-          console.error('hmm');
-        }
+        player.play('./doorbell.mp3', function (err) {
+          if (err) throw err;
+        });
         sendEmailsBro(result, currentDate);
       } else {
         console.log(`${currentDate} -- Khatam / Tata / Bye Bye`);
