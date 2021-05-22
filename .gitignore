@@ -102,3 +102,6 @@ dist
 
 # TernJS port file
 .tern-port
+
+#email ids of recipients
+RECEIVER_EMAILS.json
