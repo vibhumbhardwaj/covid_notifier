@@ -1,9 +1,17 @@
 require('dotenv').config();
+const express = require('express');
+const app = express();
+var cookieParser = require('cookie-parser');
+var session = require('express-session');
 const fetch = require('node-fetch');
 var nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
 var player = require('play-sound')(opts = { player: process.env.MUSIC_PLAYER });
+
+/* 
+* statics and globals
+*/
 
 /* 
 Memory_Emails will include all the emails that need to be notified.. Initiated on first run, and updated OTG as required.
@@ -26,14 +34,17 @@ var Memory_Results = {};
 for better logging. If not available recently, no need to print khatam tata bye bye...
 */
 var Memory_Available_Recently=true;
+var Memory_Secret = '';
+var Memory_Sound_Toggle=true;
+var Memory_Email_Toggle=false;
 
 const KURUKSHETRA_ID = 186;
 
 const startingEmail = `<div style="background: red;">&nbsp;</div>
 <div style="background: red;">&nbsp;</div>
 <div style="background: red;">&nbsp;</div>
-<h2 style="text-align: center;">Haryana Government Social Services .com</h2>
-<h4 style="text-align: center;">Vacc Notifier&copy;</h4>
+<h2 style="text-align: center;">Vacc Notifier&copy;</h2>
+<h4 style="text-align: center;">janhit mein jaari .com</h4>
 <div style="background: red;">&nbsp;</div>
 <hr />
 <h4>Hello Dear,</h4>`;
@@ -45,7 +56,7 @@ const bookSlotCallToAction = `<p>&nbsp;</p>
 <p>&nbsp;</p>`;
 
 let sudhaImg = `https://pbs.twimg.com/profile_images/485331283166244864/tUuqIX-R_400x400.jpeg`;
-let ourFoto = `https://lh3.googleusercontent.com/Xk7ehWAAkAHDt4HFScwbiuJRr51ykzPa3A-HTGg0IlbtW2w4mf-9F1AL7xKxLXb8iVM1b5j7gTjcV13eTBM-Xa20Z6AQYf4puhUKd5AabKFQ58nN_LVJSFYyIN6eVJE-vUyRbFDYBrgVQId7aYkkFJLmGT8EBFzJ86mkuAmSHFXe8wYk--iJ-U9mJqtdIFakiduqYsFerPmlQYuMXx2QDkT0_mN6KFIvn3F6Jza0qd09cFz69jO-Ee8Diq7TF9EeHCQ9HsUBx1QpZAVUFNl7zpONazjKe3qQuBFP93Vi54HydyhWrpUmD_7ieZdTdGXi7hiygMgAHRMWmB7mJsNEIsRi8zfNVUY55FMGLrc6hikI2RVHXCO_h_6GWOMM6lNFs5E77bpKKyd7pz5oYYac8vjl3enCcEicCwVCMeDRWwxLoEjQzNgNxdTgw8Pldn_ODvOSuFPCvAXsXOuuJloGq-cg0tz_krKfU-R-RgTA-FqoriyLXIXJEKB4awOkZvQpim9etHTI1T37wkPgPVO8QMviprant0hpwzDKLZsPDL9b17W9HEsjZEPaskfQtd4M3OBjQpqCx3r5TZ621KQk2SeXhzgnrxhdEB09IXirnj-nMJCakULYn22cwuS_kps5bXuypvChu-NOcI8Clyzd_8XNaY7dSCd9GePPQwqI1IsBeE-X9jXCH9fBvvivJq0cGNxNKwSLNCcUmqTRVvNRITAlxQ=w1288-h966-no?authuser=0`;
+let ourFoto = `https://i.ibb.co/SK8W3cV/us.jpg`;
 //sudha image dimensions: 220 220
 
 const closingEmail = `<h3><em>Yours Truly,</em></h3>
@@ -54,21 +65,180 @@ const closingEmail = `<h3><em>Yours Truly,</em></h3>
 <p><em>Ayy LMAO</em></p>
 <div style="background: red;">&nbsp;</div>
 <hr />
-<p style="text-align: left;"><strong><em>Powered by Microsoft&trade; Azure Secure Services.</em></strong></p>`
-/*
-//add new email to json:
-console.log(Memory_Emails);
-Memory_Emails.push('punyakant.yahoo.com');
-let jsonToWrite = {
-  emails: Memory_Emails
+<p style="text-align: left;"><strong><em>Powered by Microsoft&trade; Azure Secure Services.</em></strong></p>`;
+
+
+
+/**
+ * Server stuff
+ * START
+ */
+
+app.use(cookieParser());
+app.use(session({
+  secret: 'fg94j499w43eur90wamk3we3',
+  resave: false,
+  saveUninitialized: true
+}));
+
+ app.set('view engine', 'ejs');
+ app.use(express.static('public'));
+
+ app.get('/', (req, res) => {
+  res.render('index');
+})
+
+app.get('/test', (req, res) => {
+  res.render('test');
+})
+let apiRouterSecured = express.Router();
+let apiRouter = express.Router();
+const server = app.listen(8080);
+app.use('/api/secured',apiRouterSecured);
+app.use('/api', apiRouter);
+
+///
+// utils
+///
+
+let createOTP = (length) => {
+  return Math.round((Math.pow(36, length + 1) - Math.random() * Math.pow(36, length))).toString(36).slice(1);
 }
-fs.writeFile(path.resolve(__dirname,'RECEIVER_EMAILS.json'), JSON.stringify(jsonToWrite), err => {
-  if(err) {
-    console.error(`URGENT >> ${Memory_Emails[Memory_Emails.length - 1]} was not added to JSON. Manual Action required.`);
-    // todo: send Error to admin emails. 
+
+//////////
+// ROUTERS
+//////////
+
+apiRouterSecured.use((req, res, next) => {
+  if(req.headers.secret && req.headers.secret == Memory_Secret) {
+    console.log(req.sessionId, ' && ', Memory_LastSessionId); // just a check
+    next();
   }
 });
-*/
+
+
+
+////////////////
+// SERVER SIDE PROCESSES
+// will send success and secret. secret needs to be added in headers for next call to server.
+////////////////
+
+let authorize = (req, res) => {
+  if(req.body.password == process.env.PASSKEY){
+    Memory_Secret = createOTP(8);
+    Memory_LastSessionId = req.sessionId;
+    res.json({
+      success: true,
+      secret: Memory_Secret
+    })
+  } else {
+    res.json({
+      success: false
+    })
+  }
+}
+
+let addEmailToList = (req, res) => {
+  let newEmail = req.body.email;
+  if(Memory_Emails.includes(newEmail)) {
+    Memory_Secret = createOTP(8);
+    Memory_LastSessionId = req.sessionId;
+    return res.json({
+      success: true,
+      message: 'Already added',
+      secret: Memory_Secret
+    });
+  }
+  Memory_Emails.push(newEmail);
+  let jsonToWrite = {
+    emails: Memory_Emails
+  }
+  
+  fs.writeFile(path.resolve(__dirname, 'RECEIVER_EMAILS.json'), JSON.stringify(jsonToWrite), err => {
+    if (err) {
+      console.error(`URGENT >> ${Memory_Emails[Memory_Emails.length - 1]} was not added to JSON. Manual Action required.`);
+      player.play('./sirens.ogg');
+      //todo: send error mail to admin
+    }
+  });
+  Memory_Secret = createOTP(8);
+  Memory_LastSessionId = req.sessionId;
+  return res.json({
+    success: true,
+    message: `Added ${newEmail}`,
+    secret: Memory_Secret
+  })
+}
+
+let unsubscribeEmail = (req, res) => {
+  let removeEmail = req.body.email;
+  if(!Memory_Emails.includes(removeEmail)) {
+    Memory_Secret = createOTP(8);
+    Memory_LastSessionId = req.sessionId;
+    return res.json({
+      success: true,
+      message: 'Already removed',
+      secret: Memory_Secret
+    });
+  }
+  Memory_Emails.splice(Memory_Emails.indexOf(removeEmail),1);
+  let jsonToWrite = {
+    emails: Memory_Emails
+  }
+  
+  fs.writeFile(path.resolve(__dirname, 'RECEIVER_EMAILS.json'), JSON.stringify(jsonToWrite), err => {
+    if (err) {
+      console.error(`URGENT >> ${Memory_Emails[Memory_Emails.length - 1]} was not removed from JSON. Manual Action required.`);
+      player.play('./sirens.ogg');
+      //todo: send email to admin
+    }
+  });
+  Memory_Secret = createOTP(8);
+  Memory_LastSessionId = req.sessionId;
+  return res.json({
+    success: true,
+    message: `Removed ${newEmail}`,
+    secret: Memory_Secret
+  })
+}
+
+let toggleSoundAlerts = (req, res) => {
+  if(req.body.disableSounds) Memory_Sound = false;
+  else Memory_Sound = true;
+  Memory_Secret = createOTP(8);
+  Memory_LastSessionId = req.sessionId;
+  res.json({
+    success: true,
+    secret: Memory_Secret
+  })
+}
+
+let toggleEmailAlerts = (req, res) => {
+  if(req.body.enableEmails) Memory_Email = false;
+  else Memory_Email = true;
+  Memory_Secret = createOTP(8);
+  Memory_LastSessionId = req.sessionId;
+  res.json({
+    success: true,
+    secret: Memory_Secret
+  })
+}
+
+////////////////////////
+/////// ROUTER ENDPOINTS
+////////////////////////
+apiRouter.post('/authorize', authorize);
+
+apiRouterSecured.post('/addNewEmail', addEmailToList);
+apiRouterSecured.post('/unsubscribeEmail', unsubscribeEmail);
+apiRouterSecured.post('/toggleSoundAlerts', toggleSoundAlerts);
+apiRouterSecured.post('/toggleEmailAlerts', toggleEmailAlerts);
+
+/**
+ * Server stuff
+ * END
+ */
+
 
 
 var transporter = nodemailer.createTransport({
@@ -76,7 +246,7 @@ var transporter = nodemailer.createTransport({
   port: process.env.MAIL_SMTP_PORT,
   secure: false,
   auth: {
-    user: process.env.MAILID,
+    user: process.env.MAIL_SENDER_ID,
     pass: process.env.MAIL_APPLICATION_PASSWORD
   },
   tls: {
@@ -97,7 +267,7 @@ let sendEmailsBro = (result, currentDate) => {
   emailBody += bookSlotCallToAction + closingEmail;
 
   var mailOptions = {
-    from: '"Kurukshetra Vacc Notifier" <covid_notifier@zohomail.in>',
+    from: `"Kurukshetra Vacc Notifier" <${process.env.MAIL_SENDER_ID}>`,
     to: Memory_Emails.toString(),
     subject: `Available Centers: ${result.length}`,
     html: emailBody
@@ -174,8 +344,8 @@ let runThisShit = () => {
       //console.log(`Total available centers with vaccines: ${result.length}`);
       //result.push(`Sorry bro no nashe available at the moment. <b>Ghar raho. Safe raho.</b>`);
       if (result.length > 0) {
-        player.play('doorbell.mp3');
-        sendEmailsBro(result, currentDate);
+        if(Memory_Sound) player.play('doorbell.mp3');
+        if(Memory_Email) sendEmailsBro(result, currentDate);
         Memory_Available_Recently = true;
       } else if(Memory_Available_Recently) {
         Memory_Available_Recently=false;

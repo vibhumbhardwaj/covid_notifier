@@ -105,3 +105,6 @@ dist
 
 #email ids of recipients
 RECEIVER_EMAILS.json
+
+#test js file
+test.js
