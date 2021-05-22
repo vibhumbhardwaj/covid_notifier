@@ -34,18 +34,22 @@ var transporter = nodemailer.createTransport({
   }
 });
 
-let sendEmailsBro = (result) => {
+
+
+
+let sendEmailsBro = (result, currentDate) => {
+  console.log(currentDate, ' >> Sending Emails.. found something I guess.');
   if (!(result.length && result.length > 0)) return;
   let emailBody = 'Saste nashe available here: go enjoy...\n\n';
   for (let i = 0; i < result.length; i++) {
     emailBody += `${i + 1}. ${result[i]}\n`;
   }
+  emailBody += `Please visit official Modiji powered website: <a>https://selfregistration.cowin.gov.in</a>`;
 
-  //punyakant@outlook.com,punyakant@yahoo.com,
   var mailOptions = {
-    from: 'covid_notifier@zohomail.in',
+    from: '"Vacc Notifier © - Powered by MS™" <covid_notifier@zohomail.in>',
     to: Memory_Emails.toString(),
-    subject: `available centers: ${result.length}`,
+    subject: `Available Centers: ${result.length}`,
     text: emailBody
   };
 
@@ -108,14 +112,15 @@ let runThisShit = () => {
           //console.log(`${sessionName}@${date} -- ${available}`);
         }
       }
-      console.log(`Total available centers with vaccines: ${result.length}`);
+      //console.log(`Total available centers with vaccines: ${result.length}`);
       //result.push(`Sorry bro no nashe available at the moment. \n\n<>Ghar raho. Safe raho.</b>`);
       if (result.length > 0) {
-        sendEmailsBro(result);
+        sendEmailsBro(result, currentDate);
       } else {
         console.log(`${currentDate} -- Khatam / Tata / Bye Bye`);
       }
     });
 
 }
-runThisShit();
+setInterval(runThisShit, 3500);
+//runThisShit();
