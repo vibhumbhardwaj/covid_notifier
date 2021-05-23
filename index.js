@@ -2,12 +2,50 @@ require('dotenv').config();
 const express = require('express');
 const app = express();
 var cookieParser = require('cookie-parser');
+var favicon = require('serve-favicon');
 var session = require('express-session');
 const fetch = require('node-fetch');
 var nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
 var player = require('play-sound')(opts = { player: process.env.MUSIC_PLAYER });
+
+///
+// utils
+///
+const emailRegexp = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+let isValidEmail = (email) => {
+  return emailRegexp.test(email);
+}
+
+let createOTP = (length) => {
+  return Math.round((Math.pow(36, length + 1) - Math.random() * Math.pow(36, length))).toString(36).slice(1);
+}
+
+let getTodayDate = () => {
+
+  let today = new Date();
+  let dd = today.getDate();
+
+  let mm = today.getMonth() + 1;
+  let yyyy = today.getFullYear();
+
+  let hh = today.getHours();
+  let min = today.getMinutes();
+  let sec = today.getSeconds();
+  if (dd < 10) {
+    dd = '0' + dd;
+  }
+
+  if (mm < 10) {
+    mm = '0' + mm;
+  }
+  return [dd + '-' + mm + '-' + yyyy, `${hh}:${min}:${sec}`];
+}
+
+
+/// UTILS END
 
 /* 
 * statics and globals
@@ -34,9 +72,9 @@ var Memory_Results = {};
 for better logging. If not available recently, no need to print khatam tata bye bye...
 */
 var Memory_Available_Recently=true;
-var Memory_Secret = '';
+var Memory_LastSessionID = createOTP(99);
 var Memory_Sound_Toggle=true;
-var Memory_Email_Toggle=false;
+var Memory_Email_Toggle=true;
 
 const KURUKSHETRA_ID = 186;
 
@@ -73,7 +111,10 @@ const closingEmail = `<h3><em>Yours Truly,</em></h3>
  * Server stuff
  * START
  */
-
+app.use(express.json());
+app.use(express.urlencoded({
+  extended: true
+}));
 app.use(cookieParser());
 app.use(session({
   secret: 'fg94j499w43eur90wamk3we3',
@@ -81,10 +122,11 @@ app.use(session({
   saveUninitialized: true
 }));
 
- app.set('view engine', 'ejs');
- app.use(express.static('public'));
+app.set('view engine', 'ejs');
+app.use(express.static('public'));
+app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')))
 
- app.get('/', (req, res) => {
+app.get('/', (req, res) => {
   res.render('index');
 })
 
@@ -97,22 +139,20 @@ const server = app.listen(8080);
 app.use('/api/secured',apiRouterSecured);
 app.use('/api', apiRouter);
 
-///
-// utils
-///
-
-let createOTP = (length) => {
-  return Math.round((Math.pow(36, length + 1) - Math.random() * Math.pow(36, length))).toString(36).slice(1);
-}
 
 //////////
-// ROUTERS
+// CUTOM ROUTER MIDDLEWARES
 //////////
 
 apiRouterSecured.use((req, res, next) => {
-  if(req.headers.secret && req.headers.secret == Memory_Secret) {
-    console.log(req.sessionId, ' && ', Memory_LastSessionId); // just a check
+  if(req.sessionID && req.sessionID == Memory_LastSessionID) {
+    console.log(getTodayDate, ` >> Admin Access >> ${req.baseUrl} >> ${JSON.stringify(req.body)}`);
     next();
+  } else {
+    console.log(getTodayDate(), '403 Error');
+    res.status(403).json({
+      success: false
+    })
   }
 });
 
@@ -120,16 +160,14 @@ apiRouterSecured.use((req, res, next) => {
 
 ////////////////
 // SERVER SIDE PROCESSES
-// will send success and secret. secret needs to be added in headers for next call to server.
+// will send success and authorization. authorization needs to be added in headers for next call to server.
 ////////////////
 
 let authorize = (req, res) => {
   if(req.body.password == process.env.PASSKEY){
-    Memory_Secret = createOTP(8);
-    Memory_LastSessionId = req.sessionId;
+    Memory_LastSessionID = req.sessionID;
     res.json({
-      success: true,
-      secret: Memory_Secret
+      success: true
     })
   } else {
     res.json({
@@ -141,13 +179,16 @@ let authorize = (req, res) => {
 let addEmailToList = (req, res) => {
   let newEmail = req.body.email;
   if(Memory_Emails.includes(newEmail)) {
-    Memory_Secret = createOTP(8);
-    Memory_LastSessionId = req.sessionId;
+    Memory_LastSessionID = req.sessionID;
     return res.json({
       success: true,
-      message: 'Already added',
-      secret: Memory_Secret
+      message: 'Already added'
     });
+  } else if(isValidEmail(newEmail)) {
+    return res.json({
+      success: true,
+      message: 'enter "EMAIL" dumass!'
+    })
   }
   Memory_Emails.push(newEmail);
   let jsonToWrite = {
@@ -161,24 +202,25 @@ let addEmailToList = (req, res) => {
       //todo: send error mail to admin
     }
   });
-  Memory_Secret = createOTP(8);
-  Memory_LastSessionId = req.sessionId;
+  Memory_LastSessionID = req.sessionID;
   return res.json({
     success: true,
-    message: `Added ${newEmail}`,
-    secret: Memory_Secret
+    message: `Added ${newEmail}`
   })
 }
 
 let unsubscribeEmail = (req, res) => {
   let removeEmail = req.body.email;
-  if(!Memory_Emails.includes(removeEmail)) {
-    Memory_Secret = createOTP(8);
-    Memory_LastSessionId = req.sessionId;
+  if(isValidEmail(removeEmail)) {
     return res.json({
       success: true,
-      message: 'Already removed',
-      secret: Memory_Secret
+      message: 'enter "EMAIL" dumass!'
+    })
+  } else if(!Memory_Emails.includes(removeEmail)) {
+    Memory_LastSessionID = req.sessionID;
+    return res.json({
+      success: true,
+      message: 'Already removed'
     });
   }
   Memory_Emails.splice(Memory_Emails.indexOf(removeEmail),1);
@@ -193,34 +235,28 @@ let unsubscribeEmail = (req, res) => {
       //todo: send email to admin
     }
   });
-  Memory_Secret = createOTP(8);
-  Memory_LastSessionId = req.sessionId;
+  Memory_LastSessionID = req.sessionID;
   return res.json({
     success: true,
-    message: `Removed ${newEmail}`,
-    secret: Memory_Secret
+    message: `Removed ${newEmail}`
   })
 }
 
 let toggleSoundAlerts = (req, res) => {
-  if(req.body.disableSounds) Memory_Sound = false;
-  else Memory_Sound = true;
-  Memory_Secret = createOTP(8);
-  Memory_LastSessionId = req.sessionId;
+  if(req.body.enableSounds) Memory_Sound_Toggle = true;
+  else Memory_Sound_Toggle = false;
+  Memory_LastSessionID = req.sessionID;
   res.json({
-    success: true,
-    secret: Memory_Secret
+    success: true
   })
 }
 
 let toggleEmailAlerts = (req, res) => {
-  if(req.body.enableEmails) Memory_Email = false;
-  else Memory_Email = true;
-  Memory_Secret = createOTP(8);
-  Memory_LastSessionId = req.sessionId;
+  if(req.body.enableEmails) Memory_Email_Toggle = true;
+  else Memory_Email_Toggle = false;
+  Memory_LastSessionID = req.sessionID;
   res.json({
-    success: true,
-    secret: Memory_Secret
+    success: true
   })
 }
 
@@ -258,7 +294,7 @@ var transporter = nodemailer.createTransport({
 
 
 let sendEmailsBro = (result, currentDate) => {
-  console.log(currentDate, ' >> Sending Emails.. found something I guess.');
+  //console.log(currentDate, ' >> Sending Emails.. found something I guess.');
   if (!(result.length && result.length > 0)) return;
   let emailBody = startingEmail + slotsAvailableGreeting;
   for (let i = 0; i < result.length; i++) {
@@ -281,30 +317,6 @@ let sendEmailsBro = (result, currentDate) => {
     }
   });
 }
-
-
-
-let getTodayDate = () => {
-
-  let today = new Date();
-  let dd = today.getDate();
-
-  let mm = today.getMonth() + 1;
-  let yyyy = today.getFullYear();
-
-  let hh = today.getHours();
-  let min = today.getMinutes();
-  let sec = today.getSeconds();
-  if (dd < 10) {
-    dd = '0' + dd;
-  }
-
-  if (mm < 10) {
-    mm = '0' + mm;
-  }
-  return [dd + '-' + mm + '-' + yyyy, `${hh}:${min}:${sec}`];
-}
-
 
 let runThisShit = () => {
   let result = [];
@@ -344,14 +356,19 @@ let runThisShit = () => {
       //console.log(`Total available centers with vaccines: ${result.length}`);
       //result.push(`Sorry bro no nashe available at the moment. <b>Ghar raho. Safe raho.</b>`);
       if (result.length > 0) {
-        if(Memory_Sound) player.play('doorbell.mp3');
-        if(Memory_Email) sendEmailsBro(result, currentDate);
+        console.log(currentDate, ' >> hey wait, an active slot! WooHOO >>');
+        if(Memory_Sound_Toggle) player.play('doorbell.mp3');
+        if(Memory_Email_Toggle) sendEmailsBro(result, currentDate);
         Memory_Available_Recently = true;
       } else if(Memory_Available_Recently) {
         Memory_Available_Recently=false;
+        //console.log(currentDate, ' >> informed already.');
+      } else {
+        //console.log(currentDate, ' >> khatam / tata / bye bye');
       }
     })
     .catch(e => {
+      console.error(currentDate, `<< connection error >>`);
       //shit happens lmao
     });
 }

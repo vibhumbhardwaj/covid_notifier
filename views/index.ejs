@@ -2,7 +2,6 @@
 
 <head>
   <title>Covid Notifier</title>
-  <link rel="stylesheet" href="/css/bootstrap-4.5.0.min.css">
 </head>
 
 <body>
@@ -11,10 +10,10 @@
   <div id='passwordSection' style="padding-top:5%; padding-left: 5%; text-align: center;">
     <h3>password please</h3>
     <input type="password" id="password" class='input'>
-    <span id="unauthorized" class="text-warning" style="display: none;"></span>
+    <span id="unauthorized" class="text-warning" style="display: none;">Galat Jawaab!</span>
   </div>
 
-  <div id='mainSection' style="display: none;">
+  <div id='mainSection' style="display: none; text-align: center;">
     <span>
       <input type="checkbox" id="soundToggle" name="enableSounds" value="enableSounds">
       <label for="enableSounds">Audio Notifications</label>
@@ -23,51 +22,121 @@
       <input type="checkbox" id="emailToggle" name="enableEmails" value="enableEmails">
       <label for="enableEmails">Email Notifications</label>
     </span>
+    <br /><br /><br />
+    <span>
+      Add new email: &nbsp<input type=text placeholder="add email" id="addEmail" class="input">
+    </span>
+    <br /><br />
+    <span>
+      Remove email: &nbsp<input type=text placeholder="remove email" id="removeEmail" class="input">
+    </span>
   </div>
 
   <script>
+    let serverURL = 'http://localhost:8080';
+    const authorizationAlert = 'Please authorize yourself once again';
+
     let pwdField = document.querySelector('#password');
     let addEmailField = document.querySelector('#addEmail');
     let removeEmailField = document.querySelector('#removeEmail');
     let enableSoundsCheck = document.querySelector('#soundToggle');
     let enableEmailsCheck = document.querySelector('#emailToggle');
-    enableEmailsCheck.checked = false;
+    enableEmailsCheck.checked = true;
     enableSoundsCheck.checked = true;
 
     let pwdDiv = document.querySelector('#passwordSection');
     let mainDiv = document.querySelector('#mainSection');
+    let wrongPassword = document.querySelector('#unauthorized');
+
+    let getPostRequestOptions = (body) => {
+      if(body) body = JSON.stringify(body);
+      else body = {};
+      return {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: body
+      }
+    }
+
+    function handleErrors(response) {
+      if (!response.ok) {
+        throw Error(response.statusText);
+      }
+      return response.json();
+    }   
 
 
     pwdField.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
-        //call localhost/api/authorize : body : password
-        //receive secret, store it for later.
-        // .. and show the actual content
+        fetch(`${serverURL}/api/authorize`, getPostRequestOptions({
+          password : pwdField.value
+        }))
+        .then(handleErrors)
+        .then(data => {
+          if(data.success) {
+            pwdDiv.style.display = 'none';
+            mainDiv.style.display = 'block';
+          } else {
+            wrongPassword.style.display = 'block';
+          }
+        }).catch(function(error) {
+          if(!alert(authorizationAlert)){window.location.reload();}
+        });
       }
     });
 
     addEmailField.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
-        //call localhost/api/secured/addNewEmail : body : email
-        //receive secret, store it for later.
-        // alert
+        fetch(`${serverURL}/api/secured/addNewEmail`, getPostRequestOptions({
+          email: addEmailField.value
+        }))
+        .then(handleErrors)
+        .then(data=> {
+          if(data.success) window.alert(data.message);
+        }).catch(function(error) {
+          if(!alert(authorizationAlert)){window.location.reload();}
+        });
       }
     });
 
     removeEmailField.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
-        //call localhost/api/secured/unsubscribeEmail : body : email
-        //receive secret, store it for later.
-        // give a window.alert
+        fetch(`${serverURL}/api/secured/unsubscribeEmail`, getPostRequestOptions({
+          email: removeEmailField.value
+        }))
+        .then(handleErrors)
+        .then(data=> {
+          if(data.success) window.alert(data.message);
+        }).catch(function(error) {
+          if(!alert(authorizationAlert)){window.location.reload();}
+        });
       }
     });
 
     enableEmailsCheck.addEventListener('change', e => {
-     // call localhost/api/secured/toggleEmailAlerts
+      fetch(`${serverURL}/api/secured/toggleEmailAlerts`, getPostRequestOptions({
+        enableEmails: enableEmailsCheck.checked
+      }))
+      .then(handleErrors)
+      .then(data => {
+        if(!data.success) enableEmailsCheck.checked = !enableEmailsCheck.checked;
+      }).catch(function(error) {
+        if(!alert(authorizationAlert)){window.location.reload();}
+      });
     });
 
     enableSoundsCheck.addEventListener('change', e => {
-     // call localhost/api/secured/toggleSoundAlerts
+      fetch(`${serverURL}/api/secured/toggleSoundAlerts`, getPostRequestOptions({
+        enableSounds: enableSoundsCheck.checked
+      }))
+      .then(handleErrors)
+      .then(data => {
+        if(!data.success) enableSoundsCheck.checked = !enableSoundsCheck.checked;
+      }).catch(function(error) {
+        if(!alert(authorizationAlert)){window.location.reload();}
+      });
     });
 
 
