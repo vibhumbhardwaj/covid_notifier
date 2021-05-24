@@ -402,4 +402,4 @@ let runThisShit = () => {
 }
 console.log(getTodayDate(), ` >> Searching ....`);
 //runThisShit();
-setInterval(runThisShit, 5000);
+setInterval(runThisShit, 4500);
