@@ -72,6 +72,8 @@ var Memory_Results = {};
 for better logging. If not available recently, no need to print khatam tata bye bye...
 */
 var Memory_Available_Recently=true;
+var Memory_Error_Recently=false;
+
 var Memory_LastSessionID = createOTP(99);
 var Memory_Sound_Toggle=true;
 var Memory_Email_Toggle=true;
@@ -384,9 +386,17 @@ let runThisShit = () => {
       } else {
         //console.log(currentDate, ' >> khatam / tata / bye bye');
       }
+      if(Memory_Error_Recently) {
+        console.log(currentDate, `<< connection established >>`);
+        Memory_Error_Recently = false;
+      }
     })
     .catch(e => {
-      console.error(currentDate, `<< connection error >>`);
+      if(!Memory_Error_Recently) {
+        console.error(currentDate, `<< connection lost >>`);
+        Memory_Error_Recently = true;
+      }
+        
       //shit happens lmao
     });
 }
