@@ -145,8 +145,12 @@ app.use('/api', apiRouter);
 //////////
 
 apiRouterSecured.use((req, res, next) => {
-  if(req.sessionID && req.sessionID == Memory_LastSessionID) {
-    console.log(getTodayDate, ` >> Admin Access >> ${req.baseUrl} >> ${JSON.stringify(req.body)}`);
+  if(process.env.SECURITY_BYPASS==="true") {
+    console.log(getTodayDate(), ` >> Config Change >> ${req.originalUrl.split('/').pop()} >> ${JSON.stringify(req.body)}`);
+    next();
+  }
+  else if(req.sessionID && req.sessionID == Memory_LastSessionID) {
+    console.log(getTodayDate(), ` >> Admin Access >> ${req.originalUrl.split('/').pop()} >> ${JSON.stringify(req.body)}`);
     next();
   } else {
     console.log(getTodayDate(), '403 Error');
@@ -162,6 +166,19 @@ apiRouterSecured.use((req, res, next) => {
 // SERVER SIDE PROCESSES
 // will send success and authorization. authorization needs to be added in headers for next call to server.
 ////////////////
+
+let authorizeBypass = (req, res) => {
+  if(process.env.SECURITY_BYPASS==="true") {
+    Memory_LastSessionID = req.sessionID;
+    res.json({
+      success: true
+    })
+  } else {
+    res.json({
+      success: false
+    })
+  }
+}
 
 let authorize = (req, res) => {
   if(req.body.password == process.env.PASSKEY){
@@ -238,7 +255,7 @@ let unsubscribeEmail = (req, res) => {
   Memory_LastSessionID = req.sessionID;
   return res.json({
     success: true,
-    message: `Removed ${newEmail}`
+    message: `Removed ${removeEmail}`
   })
 }
 
@@ -264,6 +281,7 @@ let toggleEmailAlerts = (req, res) => {
 /////// ROUTER ENDPOINTS
 ////////////////////////
 apiRouter.post('/authorize', authorize);
+apiRouter.post('/authorizeBypass', authorizeBypass);
 
 apiRouterSecured.post('/addNewEmail', addEmailToList);
 apiRouterSecured.post('/unsubscribeEmail', unsubscribeEmail);

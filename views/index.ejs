@@ -50,7 +50,7 @@
 
     let getPostRequestOptions = (body) => {
       if(body) body = JSON.stringify(body);
-      else body = {};
+      //else body = {};
       return {
         method: "POST",
         headers: {
@@ -65,7 +65,17 @@
         throw Error(response.statusText);
       }
       return response.json();
-    }   
+    }
+
+    // check if it is good to go without password:
+    fetch(`${serverURL}/api/authorizeBypass`, getPostRequestOptions())
+    .then(handleErrors)
+    .then(data => {
+      if(data.success) {
+        pwdDiv.style.display = 'none';
+        mainDiv.style.display = 'block';
+      }
+    })
 
 
     pwdField.addEventListener('keydown', e => {
@@ -82,7 +92,7 @@
             wrongPassword.style.display = 'block';
           }
         }).catch(function(error) {
-          if(!alert(authorizationAlert)){window.location.reload();}
+          window.location.reload();
         });
       }
     });
@@ -96,7 +106,7 @@
         .then(data=> {
           if(data.success) window.alert(data.message);
         }).catch(function(error) {
-          if(!alert(authorizationAlert)){window.location.reload();}
+          window.location.reload();
         });
       }
     });
@@ -110,7 +120,7 @@
         .then(data=> {
           if(data.success) window.alert(data.message);
         }).catch(function(error) {
-          if(!alert(authorizationAlert)){window.location.reload();}
+          window.location.reload();
         });
       }
     });
@@ -123,7 +133,7 @@
       .then(data => {
         if(!data.success) enableEmailsCheck.checked = !enableEmailsCheck.checked;
       }).catch(function(error) {
-        if(!alert(authorizationAlert)){window.location.reload();}
+        window.location.reload();
       });
     });
 
@@ -135,11 +145,9 @@
       .then(data => {
         if(!data.success) enableSoundsCheck.checked = !enableSoundsCheck.checked;
       }).catch(function(error) {
-        if(!alert(authorizationAlert)){window.location.reload();}
+        window.location.reload();
       });
     });
-
-
 
   </script>
 </body>
