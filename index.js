@@ -56,7 +56,12 @@ Memory_Emails will include all the emails that need to be notified.. Initiated o
 Structure ::
 ['email@zoho.com', 'more@gmail.com']
 */
-var Memory_Emails = require('./RECEIVER_EMAILS.json').emails;
+var Memory_Emails;
+try{
+  Memory_Emails = require('./RECEIVER_EMAILS.json').emails;
+} catch (e) {
+  Memory_Emails = [];
+}
 
 /*
 Memory_Results will incorporate all the results tackled so far by the application.
@@ -74,11 +79,24 @@ for better logging. If not available recently, no need to print khatam tata bye 
 var Memory_Available_Recently=true;
 var Memory_Error_Recently=false;
 
-var Memory_LastSessionID = createOTP(99);
+var Memory_LastSessionID = createOTP(99);;
 var Memory_Sound_Toggle=true;
 var Memory_Email_Toggle=true;
 
 const KURUKSHETRA_ID = 186;
+
+var transporter = nodemailer.createTransport({
+  host: process.env.MAIL_SMTP_SERVER,
+  port: process.env.MAIL_SMTP_PORT,
+  secure: false,
+  auth: {
+    user: process.env.MAIL_SENDER_ID,
+    pass: process.env.MAIL_APPLICATION_PASSWORD
+  },
+  tls: {
+    ciphers: 'SSLv3'
+  }
+});
 
 const startingEmail = `<div style="background: red;">&nbsp;</div>
 <div style="background: red;">&nbsp;</div>
@@ -148,14 +166,14 @@ app.use('/api', apiRouter);
 
 apiRouterSecured.use((req, res, next) => {
   if(process.env.SECURITY_BYPASS==="true") {
-    console.log(getTodayDate(), ` >> Config Change >> ${req.originalUrl.split('/').pop()} >> ${JSON.stringify(req.body)}`);
+    console.log(getTodayDate(), `>> Config Change >> ${req.originalUrl.split('/').pop()} >> ${JSON.stringify(req.body)}`);
     next();
   }
   else if(req.sessionID && req.sessionID == Memory_LastSessionID) {
-    console.log(getTodayDate(), ` >> Admin Access >> ${req.originalUrl.split('/').pop()} >> ${JSON.stringify(req.body)}`);
+    console.log(getTodayDate(), `>> Admin Access >> ${req.originalUrl.split('/').pop()} >> ${JSON.stringify(req.body)}`);
     next();
   } else {
-    console.log(getTodayDate(), '403 Error');
+    console.log(getTodayDate(), '<< wrong password >>');
     res.status(403).json({
       success: false
     })
@@ -216,7 +234,7 @@ let addEmailToList = (req, res) => {
   
   fs.writeFile(path.resolve(__dirname, 'RECEIVER_EMAILS.json'), JSON.stringify(jsonToWrite), err => {
     if (err) {
-      console.error(`URGENT >> ${Memory_Emails[Memory_Emails.length - 1]} was not added to JSON. Manual Action required.`);
+      console.error(`<<< URGENT >>> ${Memory_Emails[Memory_Emails.length - 1]} was not added to JSON. Manual Action required.`);
       player.play('./sirens.ogg');
       //todo: send error mail to admin
     }
@@ -249,7 +267,7 @@ let unsubscribeEmail = (req, res) => {
   
   fs.writeFile(path.resolve(__dirname, 'RECEIVER_EMAILS.json'), JSON.stringify(jsonToWrite), err => {
     if (err) {
-      console.error(`URGENT >> ${Memory_Emails[Memory_Emails.length - 1]} was not removed from JSON. Manual Action required.`);
+      console.error(`<<< URGENT >> ${Memory_Emails[Memory_Emails.length - 1]} was not removed from JSON. Manual Action required.`);
       player.play('./sirens.ogg');
       //todo: send email to admin
     }
@@ -297,18 +315,7 @@ apiRouterSecured.post('/toggleEmailAlerts', toggleEmailAlerts);
 
 
 
-var transporter = nodemailer.createTransport({
-  host: process.env.MAIL_SMTP_SERVER,
-  port: process.env.MAIL_SMTP_PORT,
-  secure: false,
-  auth: {
-    user: process.env.MAIL_SENDER_ID,
-    pass: process.env.MAIL_APPLICATION_PASSWORD
-  },
-  tls: {
-    ciphers: 'SSLv3'
-  }
-});
+
 
 
 
@@ -331,18 +338,22 @@ let sendEmailsBro = (result, currentDate) => {
 
   transporter.sendMail(mailOptions, function (error, info) {
     if (error) {
-      console.log(error);
+      console.error(currentDate, '<< error sending emails >>');
     } else {
-      console.log(`Emails sent to ${Memory_Emails.length} emails`);
+      console.log(currentDate, `>> notified ${Memory_Emails.length} users`);
     }
   });
+}
+
+let clearCenterRecord = (date,centerName) => {
+  Memory_Results[date].splice(Memory_Results[date].indexOf(centerName),1);
 }
 
 let runThisShit = () => {
   let result = [];
   let currentDate = getTodayDate();
 
-  let url = `https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id=${KURUKSHETRA_ID}&date=${currentDate[0]}`;
+  let url = `https://cdn-api.co-vin.in/api/v2/appointment/sessions/calendarByDistrict?district_id=${KURUKSHETRA_ID}&date=${currentDate[0]}`;
 
   let settings = {
     method: "GET",
@@ -368,6 +379,7 @@ let runThisShit = () => {
             if(!Memory_Results[date].includes(sessionName)) {
               result.push(`${sessionName}@${date} -- ${available} slot(s) available!`);
               Memory_Results[date].push(sessionName);
+              setTimeout(clearCenterRecord(date,sessionName), 30000); //clears result after 30 seconds.
             }     
           }
           //console.log(`${sessionName}@${date} -- ${available}`);
@@ -376,18 +388,18 @@ let runThisShit = () => {
       //console.log(`Total available centers with vaccines: ${result.length}`);
       //result.push(`Sorry bro no nashe available at the moment. <b>Ghar raho. Safe raho.</b>`);
       if (result.length > 0) {
-        console.log(currentDate, ' >> hey wait, an active slot! WooHOO >>');
+        console.log(currentDate, `>> ${available} slots found !!`);
         if(Memory_Sound_Toggle) player.play('doorbell.mp3');
         if(Memory_Email_Toggle) sendEmailsBro(result, currentDate);
         Memory_Available_Recently = true;
       } else if(Memory_Available_Recently) {
         Memory_Available_Recently=false;
-        //console.log(currentDate, ' >> informed already.');
+        console.log(currentDate, '>> searching ... ');
       } else {
         //console.log(currentDate, ' >> khatam / tata / bye bye');
       }
       if(Memory_Error_Recently) {
-        console.log(currentDate, `<< connection established >>`);
+        console.log(currentDate, `>> connection established`);
         Memory_Error_Recently = false;
       }
     })
@@ -396,10 +408,14 @@ let runThisShit = () => {
         console.error(currentDate, `<< connection lost >>`);
         Memory_Error_Recently = true;
       }
-        
       //shit happens lmao
     });
 }
-console.log(getTodayDate(), ` >> Searching ....`);
+
+console.log(`\nInitialising Software ....\n`);
+console.log(`audio check`, Memory_Sound_Toggle);
+console.log('email check', Memory_Email_Toggle);
+console.log(`${Memory_Emails.length} emails in list`);
+console.log('server up @ http://localhost:8080');
 //runThisShit();
-setInterval(runThisShit, 4500);
+setInterval(runThisShit, 5000);
